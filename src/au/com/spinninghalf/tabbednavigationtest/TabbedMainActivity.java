@@ -11,15 +11,20 @@ import com.actionbarsherlock.app.SherlockFragment;
 import com.actionbarsherlock.app.SherlockFragmentActivity;
 import com.actionbarsherlock.app.ActionBar;
 import com.actionbarsherlock.app.ActionBar.Tab;
+import com.actionbarsherlock.app.SherlockListFragment;
 
-public class TabbedMainActivity extends SherlockFragmentActivity {
+public class TabbedMainActivity extends SherlockFragmentActivity 
+	implements TabbedNavigationListFragment.OnGigListSelectedListener {
+	
 	private final static String TAG = "TabbedMainActivity";
 	
-	TabListenerMobile<TabbedNavigationListFragment> listTabListenerMobile;
+	TabListenerMobileList<TabbedNavigationListFragment> listTabListenerMobile;
 	TabListenerMobile<TabbedNavigationGigFragment> gigTabListenerMobile;
 	
 	TabListenerTablet<TabbedNavigationListFragment, TabbedNavigationGigFragment> listTabListenerTablet;
-	TabListenerTablet<TabbedNavigationGigFragment, TabbedNavigationListFragment> gigTabListenerTablet;
+	TabListenerTablet<TabbedNavigationListFragment, TabbedNavigationGigFragment> gigTabListenerTablet;
+	
+	SherlockFragment gigFragment;
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -39,7 +44,7 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 				//Create and add the list tab
 			      Tab listTab = actionBar.newTab();
 
-			      listTabListenerMobile = new TabListenerMobile<TabbedNavigationListFragment>
+			      listTabListenerMobile = new TabListenerMobileList<TabbedNavigationListFragment>
 			        (this, R.id.TabbedMainFragmentContainer, TabbedNavigationListFragment.class);
 
 			      listTab.setText("List")
@@ -68,7 +73,8 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 			      Tab listTab = actionBar.newTab();
 
 			      listTabListenerTablet = new TabListenerTablet<TabbedNavigationListFragment,TabbedNavigationGigFragment >
-			        (this, R.id.TabbedTabletFragmentContainer1, R.id.TabbedTabletFragmentContainer2, TabbedNavigationListFragment.class, TabbedNavigationGigFragment.class);
+			        (this, R.id.TabbedTabletFragmentContainer1, R.id.TabbedTabletFragmentContainer2, 
+			        		TabbedNavigationListFragment.class, TabbedNavigationGigFragment.class);
 
 			      listTab.setText("List")
 			             .setContentDescription("List of Gigs")
@@ -79,8 +85,9 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 			      //Create and add the gig tab
 			      Tab gigTab = actionBar.newTab();
 			      
-			      gigTabListenerTablet = new TabListenerTablet<TabbedNavigationGigFragment, TabbedNavigationListFragment>
-			         (this, R.id.TabbedTabletFragmentContainer1, R.id.TabbedTabletFragmentContainer2, TabbedNavigationGigFragment.class, TabbedNavigationListFragment.class);
+			      gigTabListenerTablet = new TabListenerTablet< TabbedNavigationListFragment, TabbedNavigationGigFragment>
+			         (this, R.id.TabbedTabletFragmentContainer1, R.id.TabbedTabletFragmentContainer2, 
+			        		 TabbedNavigationListFragment.class, TabbedNavigationGigFragment.class);
 			      
 			      gigTab.setText("Gig Tab")
 			      		.setContentDescription("Gig View")
@@ -93,7 +100,32 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 			}
 	}
 	
+	public void onGigSelected(int position) {
+		Log.i(TAG, "in onGigSelected, selected list item position = " + position);
+		
+		//find fragment
+		//Capture the viewGig fragment from the activity layout
+        TabbedNavigationGigFragment gigFrag = (TabbedNavigationGigFragment)
+                getSupportFragmentManager().findFragmentById(R.id.TabbedTabletFragmentContainer2);
+        
+        if (gigFrag != null) {
+        	//we are in tablet mode layout.
+        	gigFrag.updateGigTextView(position);
+        } else {
+        	//we are in mobile mode and need to instantiate the fragment, then add it to the activty
+        	TabbedNavigationGigFragment newFragment =  new TabbedNavigationGigFragment(position);
+        	
+        	FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        	ft.replace(R.id.TabbedMainFragmentContainer, newFragment);
+        	ft.addToBackStack(null);
+        	ft.commit();
+        }
+		
+	}
 	
+	
+	//SHOULD THESE LISTENERS BE DECALRED 'static' ?
+	//listener for mobile layout and basic fragment class
 	public static class TabListenerMobile<T extends SherlockFragment> implements ActionBar.TabListener {
 		  
 		    private SherlockFragment fragment;
@@ -133,11 +165,51 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 		    }
 	  }
 	
+	//listener for mobile layout and list fragment class
+	public static class TabListenerMobileList<T extends SherlockListFragment> implements ActionBar.TabListener {
+
+	    private SherlockListFragment fragment;
+	    private FragmentActivity activity;
+	    private Class<T> fragmentClass;
+	    private int fragmentContainer;
+	  
+	    public TabListenerMobileList(FragmentActivity activity, int fragmentContainer, 
+	                       Class<T> fragmentClass) {
+	  
+	      this.activity = activity;
+	      this.fragmentContainer = fragmentContainer;
+	      this.fragmentClass = fragmentClass;
+	    }
+	  
+	    // Called when a new tab has been selected
+	    public void onTabSelected(Tab tab, FragmentTransaction ft) {
+	      if (fragment == null) {
+	        String fragmentName = fragmentClass.getName();
+	        fragment = (SherlockListFragment) Fragment.instantiate(activity, fragmentName); 
+	        ft.add(fragmentContainer, fragment, fragmentName);
+	      } else
+	        ft.attach(fragment);
+	    }
+	  
+	    // Called on the currently selected tab when a different tag is
+	    // selected. 
+	    public void onTabUnselected(Tab tab, FragmentTransaction ft) {
+	      if (fragment != null)
+	        ft.detach(fragment);
+	    } 
+	  
+	    // Called when the selected tab is selected.
+	    public void onTabReselected(Tab tab, FragmentTransaction ft) {
+	      if (fragment != null)
+	        ft.attach(fragment);
+	    }
+  }
+	
 	
 	//tab listener for when in tablet mode and using _2_ fragments in the container.
-	public static class TabListenerTablet<T extends SherlockFragment, U extends SherlockFragment> implements ActionBar.TabListener {
+	public static class TabListenerTablet<T extends SherlockListFragment, U extends SherlockFragment> implements ActionBar.TabListener {
 		  
-		    private SherlockFragment fragment1;
+		    private SherlockListFragment fragment1;
 		    private SherlockFragment fragment2;
 		    private FragmentActivity activity;
 		    private Class<T> fragmentClass1;
@@ -153,6 +225,7 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 		          this.fragmentContainer2 = fragmentContainer2;
 		          this.fragmentClass1 = fragmentClass1;
 		          this.fragmentClass2 = fragmentClass2;
+		          
 		    }
 		  
 		    // Called when a new tab has been selected
@@ -161,7 +234,7 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 		      //check if both fragments are null. If so, create them and add to container.
 		      if (fragment1 == null && fragment2 == null) {
 		          String fragmentName1 = fragmentClass1.getName();
-		          fragment1 = (SherlockFragment) Fragment.instantiate(activity, fragmentName1); 
+		          fragment1 = (SherlockListFragment) Fragment.instantiate(activity, fragmentName1); 
 		          ft.add(fragmentContainer1, fragment1, fragmentName1);
 		        
 		          String fragmentName2 = fragmentClass2.getName();
@@ -171,11 +244,12 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 		          Log.i(TAG, "in TabListenerTablet:onTabSelected 1st if block");
 		          Log.i(TAG, "in TabListenerTablet:onTabSelected 1st if block. fragmentContainer1 = " + fragmentContainer1);
 		          Log.i(TAG, "in TabListenerTablet:onTabSelected 1st if block. fragmentContainer2 = " + fragmentContainer2);
+		          
 		      } else if (fragment1 == null) {
 		    	  
 		    	  //fragment2 is already instantiated so dont recreate it
 		    	  String fragmentName1 = fragmentClass1.getName();
-			      fragment1 = (SherlockFragment) Fragment.instantiate(activity, fragmentName1); 
+			      fragment1 = (SherlockListFragment) Fragment.instantiate(activity, fragmentName1); 
 			      ft.add(fragmentContainer1, fragment1, fragmentName1);
 			      
 			      //ft.add(fragmentContainer, fragment2);
@@ -198,6 +272,8 @@ public class TabbedMainActivity extends SherlockFragmentActivity {
 		          ft.attach(fragment2);
 		          Log.i(TAG, "in TabListenerTablet:onTabSelected 4th if block");
 		      }
+		      
+		      //TabbedMainActivity.gigFragment = fragment2;
 		    }
 		  
 		    // Called on the currently selected tab when a different tag is
